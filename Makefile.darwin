@@ -16,7 +16,11 @@
 #darwin specific settings
 COMMANDS += containerd-shim
 
-# amd64 supports go test -race
+# amd64 supports go test -race,
+# but causes race-limit of simultaneously goroutines, thus disabled
 ifeq ($(GOARCH),amd64)
-	TESTFLAGS_RACE= -race
+	TESTFLAGS_RACE=
 endif
+
+# cri is not implemented yet on darwin
+SKIPTESTS := github.com/containerd/containerd/pkg/cri/server

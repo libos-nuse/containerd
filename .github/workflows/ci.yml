@@ -376,3 +376,91 @@ jobs:
           RUNC_FLAVOR: ${{ matrix.runc }}
           SELINUX: Enforcing
         run: vagrant up --provision-with=selinux,install-runc,test-cri
+
+  integration-macos:
+    name: macOS Integration
+    runs-on: macos-10.15
+    timeout-minutes: 30
+    needs: [project, linters, protos, man]
+
+    defaults:
+      run:
+        working-directory: src/github.com/containerd/containerd
+
+    steps:
+      - uses: actions/setup-go@v1
+        with:
+          go-version: '1.15.5'
+
+      - uses: actions/checkout@v2
+        with:
+          path: src/github.com/containerd/containerd
+
+      - uses: actions/checkout@v2
+        with:
+          repository: ukontainer/runu
+          path: src/github.com/ukontainer/runu
+
+      - name: Set env
+        shell: bash
+        run: |
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+
+      - run: script/setup/install-dev-tools
+
+      - name: Install runtime
+        shell: bash
+        run: |
+          SHIM_COMMIT=v0.8.3
+          cd /tmp
+          GO111MODULE=on go get -v github.com/ukontainer/runu@"${SHIM_COMMIT}"
+          bindir="${{ github.workspace }}/bin/"
+          cd ${{ github.workspace }}/src/github.com/ukontainer/runu
+          git fetch --tags origin "${SHIM_COMMIT}"
+          git checkout "${SHIM_COMMIT}"
+          GO111MODULE=on go build -o "${bindir}/containerd-shim-darwin-v1" ./cmd/containerd-shim-darwin-v1
+
+      - name: Binaries
+        shell: bash
+        run: |
+          set -o xtrace
+          make binaries
+
+      - name: Install containerd
+        run: |
+          make binaries
+          sudo make install
+
+      - name: make test
+        env:
+          TEST_RUNTIME: "io.containerd.darwin.v1"
+        shell: bash
+        run: |
+          make test
+
+      - name: Integration 1
+        env:
+          TEST_RUNTIME: "io.containerd.darwin.v1"
+        shell: bash
+        run: |
+          WORKDIR="$(mktemp -d)"
+          # /run is read-only under macOS
+          export EXTRA_TESTFLAGS="-address=$WORKDIR/c1.sock"
+          # default GOPATH under sudo is $HOME/go, not $HOME/.go on macos
+          sudo -E make integration
+
+      # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/175
+      - name: Integration 2
+        env:
+          TEST_RUNTIME: "io.containerd.darwin.v1"
+        shell: bash
+        run: |
+          WORKDIR="$(mktemp -d)"
+          rm -rf /var/run/containerd-test
+          rm -rf /var/lib/containerd-test
+          # /run is read-only under macOS
+          export EXTRA_TESTFLAGS="-address=$WORKDIR/c1.sock"
+          export TESTFLAGS_PARALLEL=1
+          # default GOPATH under sudo is $HOME/go, not $HOME/.go on macos
+          sudo -E make integration

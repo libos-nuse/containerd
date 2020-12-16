@@ -16,16 +16,28 @@
    limitations under the License.
 */
 
-package shim
+package containerd
 
 import (
-	"github.com/containerd/ttrpc"
+	"io/ioutil"
+	"os"
 )
 
-func newServer() (*ttrpc.Server, error) {
-	return ttrpc.NewServer()
-}
+var (
+	defaultRoot    = "/var/lib/containerd-test"
+	defaultState   = "/var/run/containerd-test"
+	defaultAddress = "/var/run/containerd-test/containerd.sock"
+	testImage      string
+	shortCommand   = withProcessArgs("hello")
+	longCommand    = withProcessArgs("ping", "127.0.0.1")
+)
 
-func subreaper() error {
-	return nil
+func init() {
+	testImage = "docker.io/ukontainer/runu-base:0.3-osx-extra"
+
+	tmpDir, _ := ioutil.TempDir("", "containerd-test-")
+	defaultRoot = tmpDir + "/root"
+	defaultState = tmpDir + "/state"
+	defaultAddress = defaultState + "/containerd.sock"
+	defer os.RemoveAll(tmpDir)
 }

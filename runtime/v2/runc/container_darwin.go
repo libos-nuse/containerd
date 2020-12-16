@@ -1,5 +1,3 @@
-// +build darwin
-
 /*
    Copyright The containerd Authors.
 
@@ -16,16 +14,14 @@
    limitations under the License.
 */
 
-package shim
+package runc
 
 import (
-	"github.com/containerd/ttrpc"
+	"github.com/containerd/containerd/pkg/process"
 )
 
-func newServer() (*ttrpc.Server, error) {
-	return ttrpc.NewServer()
+func newContainerCgroup(pid int, container *Container) {
 }
 
-func subreaper() error {
-	return nil
+func (c *Container) startCgroup(p process.Process) {
 }
